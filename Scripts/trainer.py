@@ -28,6 +28,19 @@ PARAMS = cla()
 
 # assert PARAMS.z_dim == None or PARAMS.z_dim > 0
 
+
+class NumpyToTorchDataset(torch.utils.data.Dataset):
+    def __init__(self, x_data, y_data, device):
+        self.x_data = torch.tensor(x_data, dtype=torch.float).to(device)
+        self.y_data = torch.tensor(y_data, dtype=torch.float).to(device)
+
+    def __len__(self):
+        return len(self.x_data)
+
+    def __getitem__(self, idx):
+        return self.x_data[idx], self.y_data[idx]
+
+
 random.seed(PARAMS.seed_no)
 np.random.seed(PARAMS.seed_no)
 torch.manual_seed(PARAMS.seed_no)
@@ -40,17 +53,30 @@ print("\n --- Creating network folder \n")
 savedir = make_save_dir(PARAMS)
 
 
-print("\n --- Loading training data from file\n")
-# Assuming dataset if of size N x 2, with the first column corresponding to x (the inferred variable)
-# and the second column corresponding to y (the measured variable)
-dataset_full = np.load(f"../Data/dataset.npy")
-train_data = torch.tensor(
-    dataset_full[:PARAMS.n_train, :], dtype=torch.float32)
-valid_data = torch.tensor(dataset_full[PARAMS.n_train:(
+print("\n --- Loading training datasets \n")
+X_dataset_full = np.load(PARAMS.X_dataset)
+Y_clean_dataset_full = np.load(PARAMS.Y_clean_dataset)
+Y_noisy_dataset_full = np.load(PARAMS.Y_noisy_dataset)
+
+print(X_dataset_full.shape)
+print(Y_clean_dataset_full.shape)
+print(Y_noisy_dataset_full.shape)
+
+
+X_train = torch.tensor(X_dataset_full[:PARAMS.n_train, :], dtype=torch.float32)
+Y_noisy_train = torch.tensor(
+    Y_noisy_dataset_full[:PARAMS.n_train, :], dtype=torch.float32)
+
+X_valid = torch.tensor(X_dataset_full[PARAMS.n_train:(
+    PARAMS.n_train+PARAMS.n_valid), :], dtype=torch.float32)
+Y_noisy_valid = torch.tensor(Y_noisy_dataset_full[PARAMS.n_train:(
     PARAMS.n_train+PARAMS.n_valid), :], dtype=torch.float32)
 
+print(X_valid.shape, Y_noisy_valid.shape)
+
 # Creating data loader for training data
-loader = DataLoader(train_data, batch_size=PARAMS.batch_size,
+data_object = NumpyToTorchDataset(X_train, Y_noisy_train, dev)
+loader = DataLoader(data_object, batch_size=PARAMS.batch_size,
                     shuffle=True, drop_last=True)
 
 
@@ -77,7 +103,6 @@ D_model = MLP(
     activation=activation_function,
 )
 
-
 # Moving models to correct device and adding optimizers
 G_model.to(device)
 D_model.to(device)
@@ -91,7 +116,6 @@ D_optim = torch.optim.Adam(
 # Creating sub-function to generate latent variables
 glv = partial(get_lat_var, z_dim=PARAMS.z_dim)
 
-
 # ============ Training ==================
 print("\n --- Initiating GAN training\n")
 
@@ -103,9 +127,9 @@ wd_loss_log = []
 
 
 for i in range(PARAMS.n_epoch):
-    for true in loader:
-        true_X = true[:, 0:100].to(device)
-        true_Y = true[:, 100:150].to(device)
+    for x, y in loader:
+        true_X = x.to(device)
+        true_Y = y.to(device)
 
         # ---------------- Updating critic -----------------------
         D_optim.zero_grad()
@@ -154,12 +178,10 @@ for i in range(PARAMS.n_epoch):
 
     # Saving intermediate output and generator checkpoint
     if (i + 1) % metric_save_freq == 0:
-        true_X = valid_data[:, 0:100]
-        true_Y = valid_data[:, 100:150].to(device)
+        true_X = X_valid
+        true_Y = Y_noisy_valid.to(device)
         z = glv(PARAMS.n_test)
         z = z.to(device)
-
-        print(true_X.shape, true_Y.shape, z.shape)     
 
         fake_X = G_model(torch.cat((true_Y, z), dim=1)).cpu().detach().numpy()
         rel_L2_error = calc_rel_L2_error(
@@ -170,12 +192,13 @@ for i in range(PARAMS.n_epoch):
         if (i + 1) % PARAMS.save_freq == 0:
             torch.save(G_model.state_dict(),
                        f"{savedir}/checkpoints/G_model_{i+1}.pth")
+
+        if (i + 1) % PARAMS.plot_freq == 0: 
             plt.figure()
-            plt.hist2d(fake_X.squeeze(), true_Y.cpu().detach(
-            ).numpy().squeeze(), density=True, bins=200)
-            plt.xlabel('x')
-            plt.ylabel('y')
-            plt.savefig(f'{savedir}/val_hist2d_{i+1}.pdf', bbox_inches='tight')
+            plt.plot(true_X[0], label=f"True X Sample {i+1}", color="blue")
+            plt.plot(true_Y[0], label=f"True Y Sample {i+1}", linestyle='--')
+            plt.plot(fake_X[0], label=f"Predicted X Sample {i+1}", color="red")
+            plt.savefig(f'{savedir}/plot{i+1}.pdf', bbox_inches='tight')
             plt.close()
 
 

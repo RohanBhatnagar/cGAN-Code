@@ -1,8 +1,6 @@
 # Conditional GAN Script
 # Created by: Deep Ray, University of Maryland
 # Date: 27 August 2023
-
-
 import os, shutil
 import numpy as np
 import matplotlib.pyplot as plt

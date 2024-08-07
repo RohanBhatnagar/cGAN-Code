@@ -43,10 +43,30 @@ def cla():
     parser.add_argument(
         "--n_test",
         type=int,
-        default=500, # should be <= valid_data or maybe ==
+        default=500,
         help=textwrap.dedent(
             """Number of test samples to use. Cannot be more than that available."""
         ),
+    )
+
+    # Dataset Arguments
+    parser.add_argument(
+        "--X_dataset",
+        type=str,
+        default="../Data/X_data.npy",
+        help=textwrap.dedent("""X dataset"""),
+    )
+    parser.add_argument(
+        "--Y_clean_dataset",
+        type=str,
+        default="../Data/Y_clean_data.npy",
+        help=textwrap.dedent("""Clean Y dataset"""),
+    )
+    parser.add_argument(
+        "--Y_noisy_dataset",
+        type=str,
+        default="../Data/Y_noisy_data.npy",
+        help=textwrap.dedent("""Noisy Y dataset"""),
     )
 
     # Network parameters
@@ -57,11 +77,10 @@ def cla():
         choices=["tanh", "relu", "elu"],
         help=textwrap.dedent("""Type of critic to use"""),
     )
-
     parser.add_argument(
         "--gp_coef",
         type=float,
-        default=0.5,
+        default=0.1,
         help=textwrap.dedent("""Gradient penalty parameter"""),
     )
     parser.add_argument(
@@ -111,8 +130,16 @@ def cla():
         type=int,
         default=1000,
         help=textwrap.dedent(
-            """Number of epochs after which a snapshot and plots are saved"""
+            """Number of epochs after which a snapshot is saved"""
         ),
+    )
+    parser.add_argument(
+        "--plot_freq",
+        type=int,
+        default=100,
+        help=textwrap.dedent(
+            """Number of epochs after which plots are created"""
+        )
     )
     parser.add_argument(
         "--sdir_suffix",
