@@ -86,7 +86,7 @@ def cla():
     parser.add_argument(
         "--n_critic",
         type=int,
-        default=4,
+        default=32,
         help=textwrap.dedent(
             """Number of critic updates per generator update"""),
     )

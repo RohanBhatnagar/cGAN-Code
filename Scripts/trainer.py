@@ -28,7 +28,6 @@ PARAMS = cla()
 
 # assert PARAMS.z_dim == None or PARAMS.z_dim > 0
 
-
 class NumpyToTorchDataset(torch.utils.data.Dataset):
     def __init__(self, x_data, y_data, device):
         self.x_data = torch.tensor(x_data, dtype=torch.float).to(device)
@@ -92,14 +91,16 @@ elif PARAMS.act_func == "relu":
 G_model = MLP(
     input_dim=50+PARAMS.z_dim,
     output_dim=100,
-    hidden_widths=(128, 256, 64, 32),
+    # hidden_widths=(128, 256, 64, 32),
+    hidden_widths=(100, 100, 100),
     activation=activation_function,
 )
 
 D_model = MLP(
     input_dim=150,
     output_dim=1,
-    hidden_widths=(128, 256, 64, 32),
+    # hidden_widths=(128, 256, 64, 32),
+    hidden_widths=(100, 50, 25, 10),
     activation=activation_function,
 )
 
@@ -136,7 +137,10 @@ for i in range(PARAMS.n_epoch):
         z = glv(PARAMS.batch_size)
         z = z.to(device)
 
+        # print(true_Y.shape, z.shape)
+
         fake_X = G_model(torch.cat((true_Y, z), dim=1)).detach()
+        print(fake_X.shape)
         fake_val = D_model(torch.cat((fake_X, true_Y), dim=1))
         true_val = D_model(torch.cat((true_X, true_Y), dim=1))
         gp_val = full_gradient_penalty(
@@ -182,6 +186,9 @@ for i in range(PARAMS.n_epoch):
         true_Y = Y_noisy_valid.to(device)
         z = glv(PARAMS.n_test)
         z = z.to(device)
+
+        # MC insteead of test - tile true_Y, then generate corresponding X to get a distribution
+        # # then plot the mean of the Xs, mean +- stddev
 
         fake_X = G_model(torch.cat((true_Y, z), dim=1)).cpu().detach().numpy()
         rel_L2_error = calc_rel_L2_error(
