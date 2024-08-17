@@ -53,19 +53,19 @@ def cla():
     parser.add_argument(
         "--X_dataset",
         type=str,
-        default="../Data/X_data.npy",
+        default="../Data/X_data-4000.npy",
         help=textwrap.dedent("""X dataset"""),
     )
     parser.add_argument(
         "--Y_clean_dataset",
         type=str,
-        default="../Data/Y_clean_data.npy",
+        default="../Data/Y_clean-4000.npy",
         help=textwrap.dedent("""Clean Y dataset"""),
     )
     parser.add_argument(
         "--Y_noisy_dataset",
         type=str,
-        default="../Data/Y_noisy_data.npy",
+        default="../Data/Y_noisy-4000.npy",
         help=textwrap.dedent("""Noisy Y dataset"""),
     )
 

@@ -201,13 +201,52 @@ for i in range(PARAMS.n_epoch):
                        f"{savedir}/checkpoints/G_model_{i+1}.pth")
 
         if (i + 1) % PARAMS.plot_freq == 0: 
+            one_Y = torch.tensor(np.tile(true_Y[0], (PARAMS.z_n_MC, 1)))
+            z = glv((PARAMS.z_n_MC))
+            
+            fake_X_dist = G_model(torch.cat((one_Y, z), dim = 1)).cpu().detach().numpy()
+        
+            mean_fake_X = np.mean(fake_X_dist, axis=0) 
+            stddev_fake_X = np.std(fake_X_dist, axis=0)
+            
+# python3 trainer.py --z_dim 20 --n_train 3500 --n_valid 500 --gp_coef 1 --n_critic 4 --act_func elu --batch_size 32 --z_n_MC 20 --plot_freq 100
+            print(f'*___________________{stddev_fake_X}___________________*')
             plt.figure()
             plt.plot(true_X[0], label=f"True X Sample {i+1}", color="blue")
-            plt.plot(true_Y[0], label=f"True Y Sample {i+1}", linestyle='--')
-            plt.plot(fake_X[0], label=f"Predicted X Sample {i+1}", color="red")
+            plt.plot(true_Y[0], label=f"True Y Sample {i+1}", linestyle='--', color="green")
+            plt.plot(mean_fake_X, label=f"Predicted Mean X Sample {i+1}", color="red")
+            plt.fill_between(range(len(mean_fake_X)), 
+                            mean_fake_X - stddev_fake_X, 
+                            mean_fake_X + stddev_fake_X, 
+                            color='red', alpha=0.3, label=f"Predicted X ± StdDev")
+            plt.xlabel("Index")
+            plt.ylabel("Value")
+            plt.legend()
+            plt.title(f"True X, True Y, and Predicted Mean X with StdDev for Sample {i+1}")
             plt.savefig(f'{savedir}/plot{i+1}.pdf', bbox_inches='tight')
             plt.close()
 
+
+
+# torch.Size([10, 50]) torch.Size([20, 20])
+# Traceback (most recent call last):
+#   File "/Users/aahilsudhin/cGAN-Code-2/Scripts/trainer.py", line 209, in <module>
+#     fake_X_dist = G_model(torch.cat((one_Y, z), dim = 1)).cpu().detach().numpy()
+# RuntimeError: Sizes of tensors must match except in dimension 1. Expected size 10 but got size 20 for tensor number 1 in the list.
+
+
+# torch.Size([20, 50]) torch.Size([20, 20])
+# Traceback (most recent call last):
+#   File "/Users/aahilsudhin/cGAN-Code-2/Scripts/trainer.py", line 218, in <module>
+#     print(spaces + stddev_fake_X + spaces)
+# numpy.core._exceptions.UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('<U14'), dtype('float32')) -> None
+
+
+# torch.Size([20, 50]) torch.Size([20, 20])
+# Traceback (most recent call last):
+#   File "/Users/aahilsudhin/cGAN-Code-2/Scripts/trainer.py", line 218, in <module>
+#     print(spaces + stddev_fake_X + spaces)
+# numpy.core._exceptions.UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('<U14'), dtype('float32')) -> None
 
 save_loss(G_loss_log, "g_loss", savedir, PARAMS.n_epoch)
 save_loss(D_loss_log, "d_loss", savedir, PARAMS.n_epoch)
