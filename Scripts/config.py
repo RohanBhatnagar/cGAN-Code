@@ -99,7 +99,7 @@ def cla():
     parser.add_argument(
         "--z_dim",
         type=int,
-        default=100,
+        default=1,
         help=textwrap.dedent(
             """Dimension of the latent variable."""
         ),
