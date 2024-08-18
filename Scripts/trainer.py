@@ -229,5 +229,9 @@ save_loss(D_loss_log, "d_loss", savedir, PARAMS.n_epoch)
 save_loss(wd_loss_log, "wd_loss", savedir, PARAMS.n_epoch, scale="log")
 save_loss(rel_L2_error_log, "rel_L2_error", savedir, PARAMS.n_epoch)
 
+# plot network weights (abs)
+plot_network_weights(G_model, "G_model", savedir)
+plot_network_weights(D_model, "D_model", savedir)
+
 
 print("\n ============== DONE =================\n")

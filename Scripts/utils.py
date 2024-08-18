@@ -5,6 +5,7 @@ import os
 import shutil
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 
 def make_save_dir(PARAMS):
@@ -48,7 +49,7 @@ def get_GAN_dir(PARAMS):
 def save_loss(loss, loss_name, savedir, n_epoch, scale='linear'):
     np.savetxt(f"{savedir}/{loss_name}.txt", loss)
     fig, ax1 = plt.subplots()
-    
+
     loss = [abs(l) for l in loss]
     ax1.plot(loss)
     ax1.set_xlabel("Steps")
@@ -107,3 +108,23 @@ def true_stats(dataset):
         y_list = [-0.6, 0.6]
 
     return y_list
+
+
+def plot_network_weights(model, model_name, savedir):
+    print(model.parameters)
+    for name, param in model.named_parameters():
+        if "weight" in name:
+            abs_weights = torch.abs(param).cpu().detach().numpy()
+
+            plt.figure(figsize=(10, 6))
+            plt.imshow(abs_weights, aspect='auto', cmap='viridis')
+            plt.colorbar()
+            plt.title(f"abs values of weight matrices: {model_name} - {name}")
+            plt.xlabel("outgoing weight")
+            plt.ylabel("incoming weight")
+            plt.tight_layout()
+
+            # Save plot
+            plt.savefig(
+                f"{savedir}/{model_name}_{name}_abs_weights.png", dpi=200)
+            plt.close()
