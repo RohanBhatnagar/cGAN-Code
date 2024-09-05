@@ -184,7 +184,8 @@ for i in range(PARAMS.n_epoch):
     if (i + 1) % metric_save_freq == 0:
         true_X = X_valid
         true_Y = Y_noisy_valid.to(device)
-        z = glv(PARAMS.n_test).to(device)
+        z = glv(PARAMS.n_test)
+        z = z.to(device)
 
         # MC insteead of test - tile true_Y, then generate corresponding X to get a distribution
         # # then plot the mean of the Xs, mean +- stddev
@@ -229,8 +230,12 @@ for i in range(PARAMS.n_epoch):
 
 save_loss(G_loss_log, "g_loss", savedir, PARAMS.n_epoch)
 save_loss(D_loss_log, "d_loss", savedir, PARAMS.n_epoch)
-save_loss(wd_loss_log, "wd_loss", savedir, PARAMS.n_epoch)
+save_loss(wd_loss_log, "wd_loss", savedir, PARAMS.n_epoch, scale="log")
 save_loss(rel_L2_error_log, "rel_L2_error", savedir, PARAMS.n_epoch)
+
+# plot network weights (abs)
+plot_network_weights(G_model, "G_model", savedir)
+plot_network_weights(D_model, "D_model", savedir)
 
 
 print("\n ============== DONE =================\n")

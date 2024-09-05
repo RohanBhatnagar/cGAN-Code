@@ -1,9 +1,11 @@
 # Conditional GAN Script
 # Created by: Deep Ray, University of Maryland
 # Date: 27 August 2023
-import os, shutil
+import os
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 
 def make_save_dir(PARAMS):
@@ -44,13 +46,17 @@ def get_GAN_dir(PARAMS):
     return savedir
 
 
-def save_loss(loss, loss_name, savedir, n_epoch):
+def save_loss(loss, loss_name, savedir, n_epoch, scale='linear'):
     np.savetxt(f"{savedir}/{loss_name}.txt", loss)
     fig, ax1 = plt.subplots()
+
+    loss = [abs(l) for l in loss]
     ax1.plot(loss)
     ax1.set_xlabel("Steps")
     ax1.set_ylabel(loss_name)
     ax1.set_xlim([1, len(loss)])
+
+    ax1.set_yscale(scale)
 
     ax2 = ax1.twiny()
     ax2.set_xlim([0, n_epoch])
@@ -89,16 +95,36 @@ def calc_rel_L2_error(true_X, true_Y, fake_X):
     return relative_L2_error
 
 # True conditionals at fixed y's
+
+
 def true_stats(dataset):
     if dataset == "tanh":
-        y_list = [-1.0,1.0]
+        y_list = [-1.0, 1.0]
 
     elif dataset == "bimodal":
-        y_list = [-1.0,1.0]   
+        y_list = [-1.0, 1.0]
 
     elif dataset == "swissroll":
-        y_list = [-0.6,0.6]  
+        y_list = [-0.6, 0.6]
 
-    return y_list   
+    return y_list
 
 
+def plot_network_weights(model, model_name, savedir):
+    print(model.parameters)
+    for name, param in model.named_parameters():
+        if "weight" in name:
+            abs_weights = torch.abs(param).cpu().detach().numpy()
+
+            plt.figure(figsize=(10, 6))
+            plt.imshow(abs_weights, aspect='auto', cmap='viridis')
+            plt.colorbar()
+            plt.title(f"abs values of weight matrices: {model_name} - {name}")
+            plt.xlabel("outgoing weight")
+            plt.ylabel("incoming weight")
+            plt.tight_layout()
+
+            # Save plot
+            plt.savefig(
+                f"{savedir}/{model_name}_{name}_abs_weights.png", dpi=200)
+            plt.close()
