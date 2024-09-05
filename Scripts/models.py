@@ -55,14 +55,14 @@ class MLP(nn.Module):
         self.network = nn.Sequential(*layers)
 
         # Initialize weights and biases for each linear layer
-        for layer in self.network:
-            if isinstance(layer, nn.Linear):
-                nn.init.uniform_(
-                    layer.weight, -1, 1
-                )  # Initialize weights with uniform distribution between -1 and 1
-                nn.init.uniform_(
-                    layer.bias, -1, 1
-                )  # Initialize biases with uniform distribution between -1 and 1
+        # for layer in self.network:
+        #     if isinstance(layer, nn.Linear):
+        #         nn.init.uniform_(
+        #             layer.weight, -1, 1
+        #         )  # Initialize weights with uniform distribution between -1 and 1
+        #         nn.init.uniform_(
+        #             layer.bias, -1, 1
+        #         )  # Initialize biases with uniform distribution between -1 and 1
 
     def forward(self, x):
         # Define how input data passes through the network
@@ -71,7 +71,7 @@ class MLP(nn.Module):
 
 def get_lat_var(batch_size, z_dim):
     """This function generates latent variables"""
-    z = randn((batch_size, z_dim))
+    z = randn((batch_size, z_dim))*0
     return z
 
 
