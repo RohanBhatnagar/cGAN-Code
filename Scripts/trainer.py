@@ -81,7 +81,7 @@ loader = DataLoader(data_object, batch_size=PARAMS.batch_size,
 
 
 print("\n --- Creating conditional GAN models\n")
-
+ 
 if PARAMS.act_func == "tanh":
     activation_function = torch.nn.Tanh()
 elif PARAMS.act_func == "elu":
