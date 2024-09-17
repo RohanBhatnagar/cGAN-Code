@@ -90,29 +90,29 @@ elif PARAMS.act_func == "relu":
     activation_function = torch.nn.ReLU()
 
 G_model = MLP(
-    input_dim=50+PARAMS.z_dim,
-    output_dim=100,
+    input_dim=Y_noisy_train.shape[1]+PARAMS.z_dim,
+    output_dim=X_train.shape[1],
     # hidden_widths=(128, 256, 64, 32),
     hidden_widths=(100, 100, 100),
     activation=activation_function,
 )
 
 D_model = MLP(
-    input_dim=150,
+    input_dim=200,
     output_dim=1,
     # hidden_widths=(128, 256, 64, 32),
-    hidden_widths=(100, 50, 25, 10),
+    hidden_widths=(100, 50, 20, 10),
     activation=activation_function,
 )
 
 # Moving models to correct device and adding optimizers
 G_model.to(device)
 D_model.to(device)
-G_optim = torch.optim.Adam(
-    G_model.parameters(), lr=0.001, betas=(0.5, 0.9), weight_decay=PARAMS.reg_param
+G_optim = torch.optim.AdamW(
+    G_model.parameters(), lr=0.001, weight_decay=PARAMS.reg_param
 )
-D_optim = torch.optim.Adam(
-    D_model.parameters(), lr=0.001, betas=(0.5, 0.9), weight_decay=PARAMS.reg_param
+D_optim = torch.optim.AdamW(
+    D_model.parameters(), lr=0.001, weight_decay=PARAMS.reg_param
 )
 
 # Creating sub-function to generate latent variables

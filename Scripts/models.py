@@ -71,7 +71,7 @@ class MLP(nn.Module):
 
 def get_lat_var(batch_size, z_dim):
     """This function generates latent variables"""
-    z = randn((batch_size, z_dim))*0
+    z = randn((batch_size, z_dim))
     return z
 
 
