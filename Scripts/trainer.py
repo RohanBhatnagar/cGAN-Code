@@ -98,7 +98,7 @@ G_model = MLP(
 )
 
 D_model = MLP(
-    input_dim=200,
+    input_dim=X_train.shape[1] + Y_noisy_train.shape[1],
     output_dim=1,
     # hidden_widths=(128, 256, 64, 32),
     hidden_widths=(100, 50, 20, 10),
@@ -220,6 +220,14 @@ for i in range(PARAMS.n_epoch):
                              mean_fake_X - stddev_fake_X,
                              mean_fake_X + stddev_fake_X,
                              color='red', alpha=0.3, label=f"Predicted X ± StdDev")
+            
+            plt.plot(
+                fake_X_dist[0,:], label=f"X_1")
+            plt.plot(
+                fake_X_dist[1,:], label=f"X_2")
+            plt.plot(
+                fake_X_dist[2,:], label=f"X_3")
+            
             plt.xlabel("Index")
             plt.ylabel("Value")
             plt.legend()
