@@ -220,7 +220,7 @@ for i in range(PARAMS.n_epoch):
                              mean_fake_X - stddev_fake_X,
                              mean_fake_X + stddev_fake_X,
                              color='red', alpha=0.3, label=f"Predicted X ± StdDev")
-            
+             
             plt.plot(
                 fake_X_dist[0,:], label=f"X_1")
             plt.plot(
