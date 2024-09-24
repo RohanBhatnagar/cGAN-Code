@@ -48,7 +48,6 @@ metric_save_freq = max(PARAMS.save_freq // 100, 1)
 
 print("\n ============== LAUNCHING TRAINING SCRIPT =================\n")
 
-
 print("\n --- Creating network folder \n")
 savedir = make_save_dir(PARAMS)
 
@@ -81,7 +80,7 @@ loader = DataLoader(data_object, batch_size=PARAMS.batch_size,
 
 
 print("\n --- Creating conditional GAN models\n")
-#use elu
+# use elu
 if PARAMS.act_func == "tanh":
     activation_function = torch.nn.Tanh()
 elif PARAMS.act_func == "elu":
@@ -89,21 +88,34 @@ elif PARAMS.act_func == "elu":
 elif PARAMS.act_func == "relu":
     activation_function = torch.nn.ReLU()
 
-G_model = MLP(
-    input_dim=Y_noisy_train.shape[1]+PARAMS.z_dim,
-    output_dim=X_train.shape[1],
-    # hidden_widths=(128, 256, 64, 32),
-    hidden_widths=(100, 100, 100),
+# G_model = MLP(
+#     input_dim=Y_noisy_train.shape[1]+PARAMS.z_dim,
+#     output_dim=X_train.shape[1],
+#     # hidden_widths=(128, 256, 64, 32),
+#     hidden_widths=(100, 100, 100),
+#     activation=activation_function,
+# )
+
+G_model = G_model_CNN(
+    x_dim=X_train.shape[1],
+    y_dim=Y_noisy_train.shape[1],
     activation=activation_function,
 )
 
-D_model = MLP(
-    input_dim=X_train.shape[1] + Y_noisy_train.shape[1],
-    output_dim=1,
-    # hidden_widths=(128, 256, 64, 32),
-    hidden_widths=(100, 50, 20, 10),
+# D_model = MLP(
+#     input_dim=X_train.shape[1] + Y_noisy_train.shape[1],
+#     output_dim=1,
+#     # hidden_widths=(128, 256, 64, 32),
+#     hidden_widths=(100, 50, 20, 10),
+#     activation=activation_function,
+# )
+
+D_model = D_model_CNN(
+    x_dim=X_train.shape[1],
+    y_dim=Y_noisy_train.shape[1],
     activation=activation_function,
 )
+
 
 # Moving models to correct device and adding optimizers
 G_model.to(device)
@@ -201,7 +213,8 @@ for i in range(PARAMS.n_epoch):
                        f"{savedir}/checkpoints/G_model_{i+1}.pth")
 
         if (i + 1) % PARAMS.plot_freq == 0:
-            one_Y = torch.tensor(np.tile(true_Y[0], (PARAMS.z_n_MC, 1))).to(device)
+            one_Y = torch.tensor(
+                np.tile(true_Y[0], (PARAMS.z_n_MC, 1))).to(device)
             z = glv((PARAMS.z_n_MC)).to(device)
 
             fake_X_dist = G_model(
@@ -220,14 +233,14 @@ for i in range(PARAMS.n_epoch):
                              mean_fake_X - stddev_fake_X,
                              mean_fake_X + stddev_fake_X,
                              color='red', alpha=0.3, label=f"Predicted X ± StdDev")
-            
+
             plt.plot(
-                fake_X_dist[0,:], label=f"X_1")
+                fake_X_dist[0, :], label=f"X_1")
             plt.plot(
-                fake_X_dist[1,:], label=f"X_2")
+                fake_X_dist[1, :], label=f"X_2")
             plt.plot(
-                fake_X_dist[2,:], label=f"X_3")
-            
+                fake_X_dist[2, :], label=f"X_3")
+
             plt.xlabel("Index")
             plt.ylabel("Value")
             plt.legend()

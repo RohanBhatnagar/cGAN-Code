@@ -24,8 +24,10 @@ from torch import (
     empty,
 )
 import torch.nn as nn
+import torch
 import torch.nn.functional as F
 from functools import partial
+
 
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_widths, activation):
@@ -66,6 +68,91 @@ class MLP(nn.Module):
 
     def forward(self, x):
         # Define how input data passes through the network
+        return self.network(x)
+
+
+class G_model_CNN(nn.Module):
+    def __init__(self, z_dim, y_dim, activation):
+        super(G_model_CNN, self).__init__()
+
+        self.input_dim = y_dim + z_dim
+
+        # upscaling from 55 to 100
+        self.transpose_input = nn.ConvTranspose1d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=6,
+            stride=2,
+            padding=1
+        )
+
+        # padded Conv1D layers to maintain shape for X output
+        self.network = nn.Sequential(
+            nn.ConvTranspose1d(in_channels=1, out_channels=2,
+                               kernel_size=3, stride=1),
+            activation,
+            nn.ConvTranspose1d(in_channels=2, out_channels=4,
+                               kernel_size=3, stride=1),
+            activation,
+            nn.Conv1d(in_channels=4, out_channels=8,
+                      kernel_size=3, stride=1, padding=1),
+            activation,
+            nn.Conv1d(in_channels=8, out_channels=4,
+                      kernel_size=3, stride=1, padding=1),
+            activation,
+            nn.Conv1d(in_channels=4, out_channels=2,
+                      kernel_size=3, stride=1, padding=1),
+            activation,
+            nn.Conv1d(in_channels=2, out_channels=1,
+                      kernel_size=3, stride=1, padding=1)
+        )
+
+    def forward(self, y, z):
+        x = torch.cat((y, z), dim=1)  # stack y, z
+        x = x.unsqueeze(1)  # add channel
+        x = self.tranpose_input(x)  # increase input dimension to 100
+        return x.squeeze(1)  # remove channel
+# 1d convolution layer 
+# input size 100, conv layer size 3 stride 1
+# see how many layers you need 
+#  , increase number of channels to 2, then 4, then 8, 4,2, back to 1 
+# 
+
+
+# 150 down to 1, using 1d convolution layers with elu activation 
+# use avg pooling to shrink 
+
+
+# input y, z stacked 
+# tranpose conv layer to inc dimension to 100
+# followed by elu 
+# another tranpose 
+# elu 
+
+# k = 3, 5, stide = 2, 1
+
+class D_model_CNN(nn.Module):
+    def __init__(self, x_dim, y_dim, activation):
+        super(D_model_CNN, self).__init__()
+
+        self.input_dim = x_dim + y_dim
+
+        self.network = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=2, kernel_size=3, stride=1),
+            activation,
+            nn.Conv1d(in_channels=2, out_channels=4, kernel_size=3, stride=1),
+            activation,
+            nn.Conv1d(in_channels=4, out_channels=8, kernel_size=3, stride=1),
+            activation,
+            nn.AvgPool1d(kernel_size=2),
+            nn.Flatten(),  # Flatten the output for the final linear layer
+            # Adjust 150 based on the actual size after pooling
+            nn.Linear(in_features=150, out_features=1)
+        )
+
+    def forward(self, x, y):
+        x = torch.cat((x, y), dim=1)  # Concatenate x and y
+        x = x.unsqueeze(1)  # Add channel dimension
         return self.network(x)
 
 
