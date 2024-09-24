@@ -80,7 +80,7 @@ loader = DataLoader(data_object, batch_size=PARAMS.batch_size,
 
 
 print("\n --- Creating conditional GAN models\n")
-# use elu
+#use elu
 if PARAMS.act_func == "tanh":
     activation_function = torch.nn.Tanh()
 elif PARAMS.act_func == "elu":
@@ -115,7 +115,6 @@ D_model = D_model_CNN(
     y_dim=Y_noisy_train.shape[1],
     activation=activation_function,
 )
-
 
 # Moving models to correct device and adding optimizers
 G_model.to(device)
@@ -213,8 +212,7 @@ for i in range(PARAMS.n_epoch):
                        f"{savedir}/checkpoints/G_model_{i+1}.pth")
 
         if (i + 1) % PARAMS.plot_freq == 0:
-            one_Y = torch.tensor(
-                np.tile(true_Y[0], (PARAMS.z_n_MC, 1))).to(device)
+            one_Y = torch.tensor(np.tile(true_Y[0], (PARAMS.z_n_MC, 1))).to(device)
             z = glv((PARAMS.z_n_MC)).to(device)
 
             fake_X_dist = G_model(
@@ -233,14 +231,14 @@ for i in range(PARAMS.n_epoch):
                              mean_fake_X - stddev_fake_X,
                              mean_fake_X + stddev_fake_X,
                              color='red', alpha=0.3, label=f"Predicted X ± StdDev")
-
+            
             plt.plot(
-                fake_X_dist[0, :], label=f"X_1")
+                fake_X_dist[0,:], label=f"X_1")
             plt.plot(
-                fake_X_dist[1, :], label=f"X_2")
+                fake_X_dist[1,:], label=f"X_2")
             plt.plot(
-                fake_X_dist[2, :], label=f"X_3")
-
+                fake_X_dist[2,:], label=f"X_3")
+            
             plt.xlabel("Index")
             plt.ylabel("Value")
             plt.legend()
