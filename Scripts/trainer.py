@@ -15,7 +15,7 @@ import random
 from config import cla
 from utils import *
 from models import *
-
+from UNetWithCIN1D import *
 
 if torch.cuda.is_available():
     dev = "cuda:0"
@@ -71,7 +71,7 @@ X_valid = torch.tensor(X_dataset_full[PARAMS.n_train:(
 Y_noisy_valid = torch.tensor(Y_noisy_dataset_full[PARAMS.n_train:(
     PARAMS.n_train+PARAMS.n_valid), :], dtype=torch.float32)
 
-print(X_valid.shape, Y_noisy_valid.shape)
+print("X_Valid: ", X_valid.shape, "Y_noisy: ", Y_noisy_valid.shape)
 
 # Creating data loader for training data
 data_object = NumpyToTorchDataset(X_train, Y_noisy_train, dev)
@@ -80,7 +80,7 @@ loader = DataLoader(data_object, batch_size=PARAMS.batch_size,
 
 
 print("\n --- Creating conditional GAN models\n")
-#use elu
+# use elu
 if PARAMS.act_func == "tanh":
     activation_function = torch.nn.Tanh()
 elif PARAMS.act_func == "elu":
@@ -88,33 +88,9 @@ elif PARAMS.act_func == "elu":
 elif PARAMS.act_func == "relu":
     activation_function = torch.nn.ReLU()
 
-# G_model = MLP(
-#     input_dim=Y_noisy_train.shape[1]+PARAMS.z_dim,
-#     output_dim=X_train.shape[1],
-#     # hidden_widths=(128, 256, 64, 32),
-#     hidden_widths=(100, 100, 100),
-#     activation=activation_function,
-# )
+G_model = UNetWithCIN1D(y_dim=50, x_dim=100, z_dim=5)
 
-G_model = G_model_CNN(
-    x_dim=X_train.shape[1],
-    y_dim=Y_noisy_train.shape[1],
-    activation=activation_function,
-)
-
-# D_model = MLP(
-#     input_dim=X_train.shape[1] + Y_noisy_train.shape[1],
-#     output_dim=1,
-#     # hidden_widths=(128, 256, 64, 32),
-#     hidden_widths=(100, 50, 20, 10),
-#     activation=activation_function,
-# )
-
-D_model = D_model_CNN(
-    x_dim=X_train.shape[1],
-    y_dim=Y_noisy_train.shape[1],
-    activation=activation_function,
-)
+D_model = CriticModel(x_dim=100, y_dim=50)
 
 # Moving models to correct device and adding optimizers
 G_model.to(device)
@@ -151,9 +127,9 @@ for i in range(PARAMS.n_epoch):
 
         # print(true_Y.shape, z.shape)
 
-        fake_X = G_model(torch.cat((true_Y, z), dim=1)).detach()
-        fake_val = D_model(torch.cat((fake_X, true_Y), dim=1))
-        true_val = D_model(torch.cat((true_X, true_Y), dim=1))
+        fake_X = G_model(true_Y, z).detach()
+        fake_val = D_model(fake_X, true_Y)
+        true_val = D_model(fake_X, true_Y)
         gp_val = full_gradient_penalty(
             fake_X=fake_X,
             true_X=true_X,
@@ -212,7 +188,8 @@ for i in range(PARAMS.n_epoch):
                        f"{savedir}/checkpoints/G_model_{i+1}.pth")
 
         if (i + 1) % PARAMS.plot_freq == 0:
-            one_Y = torch.tensor(np.tile(true_Y[0], (PARAMS.z_n_MC, 1))).to(device)
+            one_Y = torch.tensor(
+                np.tile(true_Y[0], (PARAMS.z_n_MC, 1))).to(device)
             z = glv((PARAMS.z_n_MC)).to(device)
 
             fake_X_dist = G_model(
@@ -231,14 +208,14 @@ for i in range(PARAMS.n_epoch):
                              mean_fake_X - stddev_fake_X,
                              mean_fake_X + stddev_fake_X,
                              color='red', alpha=0.3, label=f"Predicted X ± StdDev")
-            
+
             plt.plot(
-                fake_X_dist[0,:], label=f"X_1")
+                fake_X_dist[0, :], label=f"X_1")
             plt.plot(
-                fake_X_dist[1,:], label=f"X_2")
+                fake_X_dist[1, :], label=f"X_2")
             plt.plot(
-                fake_X_dist[2,:], label=f"X_3")
-            
+                fake_X_dist[2, :], label=f"X_3")
+
             plt.xlabel("Index")
             plt.ylabel("Value")
             plt.legend()
