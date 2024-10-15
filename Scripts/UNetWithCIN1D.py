@@ -30,160 +30,139 @@ import torch.nn.functional as F
 from functools import partial
 
 
+# Conditional Instance Normalization
 class CondInsNorm(nn.Module):
-    ''' Implementing conditional instance normalization
-        where input_x is normalized wrt input_z
-        input_x is assumed to have the shape (N, x_dim, H)
-        input_z is assumed to have the shape (N, z_dim, 5)
-    '''
-
     def __init__(self, x_dim, z_dim, eps=1.0e-6, act_param=0.1):
         super(CondInsNorm, self).__init__()
         self.eps = eps
         self.z_shift = nn.Sequential(
-            nn.Conv1d(in_channels=z_dim,
-                      out_channels=x_dim,
-                      kernel_size=1,
-                      stride=1),
+            nn.Conv1d(z_dim, x_dim, kernel_size=1),
             nn.ELU(alpha=act_param)
         )
         self.z_scale = nn.Sequential(
-            nn.Conv1d(in_channels=z_dim,
-                      out_channels=x_dim,
-                      kernel_size=1,
-                      stride=1),
+            nn.Conv1d(z_dim, x_dim, kernel_size=1),
             nn.ELU(alpha=act_param)
         )
 
     def forward(self, x, z):
-        x_size = x.size()
-        assert len(x_size) == 3
-        assert len(z.size()) == 3
+        z_upsampled = F.interpolate(z, size=x.size(
+            2), mode='linear', align_corners=True)
+        shift = self.z_shift(z_upsampled)
+        scale = self.z_scale(z_upsampled)
 
-        shift = self.z_shift(z)
-        scale = self.z_scale(z)
+        x_mean = x.mean(dim=2, keepdim=True)
+        x_var = x.var(dim=2, keepdim=True)
+        x_norm = (x - x_mean) / torch.sqrt(x_var + self.eps)
+        return x_norm * scale + shift
 
-        # print("Shift shape: ", shift.shape)
-        # print("Scale shape: ", scale.shape)
-
-        x_reshaped = x.view(x_size[0], x_size[1], x_size[2])
-        x_mean = x_reshaped.mean(2, keepdim=True)
-        x_var = x_reshaped.var(2, keepdim=True)
-        x_rstd = torch.rsqrt(x_var + self.eps)  # reciprocal sqrt
-        x_s = ((x_reshaped - x_mean) * x_rstd).view(*x_size)
-        output = x_s * scale + shift
-
-        # print("Shape of output: ", output.shape)
-
-        return output
+# U-Net with Conditional Instance Normalization
 
 
-''' Generator model. We want to introduce the latent variable Z at every layer, as per the NACO paper.'''
+class UNetCondInsNorm(nn.Module):
+    def __init__(self, z_dim):
+        super(UNetCondInsNorm, self).__init__()
 
+        # Encoder (Downsampling)
+        self.down_conv1 = nn.Conv1d(1, 2, kernel_size=3, padding=1)
+        self.down_conv2 = nn.Conv1d(2, 4, kernel_size=3, padding=1)
+        self.down_conv3 = nn.Conv1d(4, 8, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(2)
 
-class UNetWithCIN1D(nn.Module):
-    def __init__(self, y_dim, x_dim, z_dim, activation=torch.nn.ELU()):
-        super(UNetWithCIN1D, self).__init__()
+        # Conditional Instance Normalization
+        self.cond_norm1 = CondInsNorm(2, z_dim)
+        self.cond_norm2 = CondInsNorm(4, z_dim)
+        self.cond_norm3 = CondInsNorm(8, z_dim)
 
-        self.down1 = self.conv_block(y_dim, 64)
-        self.down2 = self.conv_block(64, 128)
-        self.down3 = self.conv_block(128, 256)
+        # Decoder (Upsampling)
+        self.up_trans1 = nn.ConvTranspose1d(8, 4, kernel_size=2, stride=2)
+        self.up_trans2 = nn.ConvTranspose1d(4, 2, kernel_size=2, stride=2, output_padding=1)
+        self.up_trans3 = nn.ConvTranspose1d(2, 1, kernel_size=2, stride=2)
 
-        self.up3 = self.conv_block(256, 128)
-        self.up2 = self.conv_block(128, 64)
-        self.up1 = self.conv_block(64, x_dim)
+        self.upsample = nn.ConvTranspose1d(1, 1, kernel_size=2, stride=2, output_padding=0)  # Upsample from 50 to 100
 
-        self.cin1 = CondInsNorm(64, z_dim)
-        self.cin2 = CondInsNorm(128, z_dim)
-        self.cin3 = CondInsNorm(256, z_dim)
-        self.cin4 = CondInsNorm(128, z_dim)
-        self.cin5 = CondInsNorm(64, z_dim)
-        self.cin6 = CondInsNorm(x_dim, z_dim)
+        self.cond_norm4 = CondInsNorm(4, z_dim)
+        self.cond_norm5 = CondInsNorm(2, z_dim)
+        self.cond_norm6 = CondInsNorm(1, z_dim)
 
-        self.final_conv = nn.Conv1d(100, x_dim, kernel_size=1)
-        self.activation = activation
-
-    def conv_block(self, in_channels, out_channels):
-        return nn.Sequential(
-            nn.Conv1d(in_channels, out_channels, kernel_size=3,
-                      padding=1, stride=1),
-            torch.nn.ELU(),
-        )
-
-    def cin_block(self, out_channels, z_dim):
-        return nn.Sequential(
-            CondInsNorm(out_channels, z_dim)
-        )
+        self.elu = nn.ELU()
 
     def forward(self, y, z):
-        d1 = self.down1(y)  # (N, 64, length)
-        d1 = self.cin1(d1, z)  # Apply CIN after down1
+        # Encoder
+        y1 = self.elu(self.down_conv1(y))  # [50, 1] -> [50, 2]
+        y1 = self.cond_norm1(y1, z)
+        y1_pooled = self.pool(y1)          # [50, 2] -> [25, 2]
 
-        d2 = self.down2(d1)  # (N, 128, length)
-        d2 = self.cin2(d2, z)  # Apply CIN after down2
+        y2 = self.elu(self.down_conv2(y1_pooled))  # [25, 2] -> [25, 4]
+        y2 = self.cond_norm2(y2, z)
+        y2_pooled = self.pool(y2)                # [25, 4] -> [12, 4]
 
-        d3 = self.down3(d2)  # (N, 256, length)
-        d3 = self.cin3(d3, z)  # Apply CIN after down3
+        y3 = self.elu(self.down_conv3(y2_pooled))  # [12, 4] -> [12, 8]
+        y3 = self.cond_norm3(y3, z)
+        y3_pooled = self.pool(y3)  # Corrected: [12, 8] -> [6, 8]
 
-        # Upsampling path
-        u3 = self.up3(d3)  # (N, 128, length)
-        u3 = self.cin4(u3, z)  # Apply CIN after up3
+        # Decoder
+        y_up1 = self.elu(self.up_trans1(y3_pooled))  # [6, 8] -> [12, 4]
+        y_up1 = self.cond_norm4(y_up1, z)
 
-        u2 = self.up2(u3 + d2)  # (N, 64, length)
-        u2 = self.cin5(u2, z)  # Apply CIN after up2
+        y_up2 = self.elu(self.up_trans2(y_up1))      # [12, 4] -> [25, 2]
+        y_up2 = self.cond_norm5(y_up2, z)
 
-        u1 = self.up1(u2 + d1)  # (N, x_dim, length)
-        u1 = self.cin6(u1, z)  # Apply CIN after up1
+        y_up3 = self.elu(self.up_trans3(y_up2)) # [25, 2] -> [50, 1]
+        y_up3 = self.cond_norm6(y_up3, z)
 
-        output = self.final_conv(u1)  # Final convolution
+        # Final upsample 
+        out = self.elu(self.upsample(y_up3)) # [50, 1] -> [100, 1]
 
-        return self.activation(output)
+        print("OUTPUT", out.shape)
+        return out
 
 
-# Test generator model forward pass here
+# Initialize model
+generator = UNetCondInsNorm(z_dim=5)
 
-y_dim = 50
-x_dim = 100
-z_dim = 5
+# Example input
+y = torch.randn(1, 1, 50)
+z = torch.randn(1, 5, 5)
 
-y = torch.randn(10, 50, 1)
-z = torch.randn(10, 5, 1)
-
-generator = UNetWithCIN1D(y_dim=y_dim, x_dim=x_dim,
-                          z_dim=z_dim)
-
+# Forward pass
 output = generator(y, z)
-print("Generator model shape: ", output.shape)
 
 
 ''' Critic Model: Idea here is to reduce x dimension to y dimension, then stack them and reduce to a scalar. '''
 ''' Assumption: x_dim = 100, y_dim = 50'''
 
-
 class CriticModel(nn.Module):
     def __init__(self, x_dim=100, y_dim=50):
         super(CriticModel, self).__init__()
 
-        self.avg_pool = nn.AvgPool1d(kernel_size=2, stride=2)
-        # stack X and Y into channel and feed into 1d convolution
-        self.conv = nn.Conv1d(in_channels=2, out_channels=1,
-                              kernel_size=3, stride=1, padding=1)
-        self.fc = nn.Linear(50, 1)  # dense layer to reduce to scalar
+        self.downsample_x = nn.Conv1d(in_channels=1, out_channels=1, kernel_size=4, stride=2, padding=1) 
+
+        self.conv = nn.Conv1d(in_channels=2, out_channels=1, kernel_size=3, stride=1, padding=1) # stack x and y 
+        
+
+        # MLP to reduce to scalar 
+        self.fc1 = nn.Linear(50, 25)  
+        self.fc2 = nn.Linear(25, 1) 
+
+        self.elu = nn.ELU()
+
 
     def forward(self, x, y):
-        x = x.unsqueeze(1)
-        y = y.unsqueeze(1)
+        x = x.unsqueeze(1)  
+        y = y.unsqueeze(1)  
 
-        x = self.avg_pool(x)
+        x = self.downsample_x(x)
 
-        # combined shape: [batch_size, 2, 50]
+        # Combined shape after concatenation: [batch_size, 2, 50]
         combined = torch.cat((x, y), dim=1)
 
-        combined = self.conv(combined)
-        combined = combined.squeeze(1)
+        # Pass through convolution layer
+        combined = self.conv(combined)  # [batch_size, 2, 50] -> [batch_size, 1, 50]
+        combined = combined.squeeze(1)  # Remove channel dimension: [batch_size, 1, 50] -> [batch_size, 50]
 
-        # Pass through the fully connected layer to reduce to scalar
-        output = self.fc(combined)
+        # Pass through MLP
+        combined = self.elu(self.fc1(combined)) 
+        output = self.elu(self.fc2(combined)) 
 
         return output
 
@@ -220,11 +199,14 @@ class CriticSummaryWrapper(nn.Module):
     def forward(self, x):
         # Create a dummy y tensor with the correct size and pass it to the model
         batch_size = x.size(0)
-        y = torch.randn(batch_size, self.y_size).to(x.device)  # Generate dummy y tensor
+        y = torch.randn(batch_size, self.y_size).to(
+            x.device)  # Generate dummy y tensor
         return self.model(x, y)
 
-critic = CriticSummaryWrapper(critic, y_size=50)  # Ensure y_size matches your model
+
+# Ensure y_size matches your model
+critic = CriticSummaryWrapper(critic, y_size=50)
 summary(critic, input_size=(100,))
 
 generator = ModelSummaryWrapper(generator, z_dim=5)
-summary(generator, input_size=(50, 1))
+summary(generator, input_size=(1, 50))
